@@ -9,41 +9,51 @@
      <script src="script.js" defer></script>
 </head>
 <body>
-     <header class="header">
-          <h1 class="title">hello, there</h1>
-          <p class="subtitle">how can i help you today?</p>
-          <ul class="suggestion-list">
-               <li class="suggestion">
-                    <h4 class="text">help me plan a game night with my 5 best friends for under $100.</h4>
+     <div class="container">
+          <header class="application-header">
+               <h1 class="heading">hello, there</h1>
+               <h4 class="sub-heading">how can i help you today?</h4>
+          </header>
+          <ul class="suggestions">
+               <li class="suggestions-item">
+                    <p class="text">design a home office setup for remote work under $500.</p>
                     <span class="icon material-symbols-rounded">draw</span>
                </li>
-               <li class="suggestion">
-                    <h4 class="text">what are the best tips to improve my public speaking skills?</h4>
+               <li class="suggestions-item">
+                    <p class="text">how can i level up my web development expertise in 2025?</p>
                     <span class="icon material-symbols-rounded">lightbulb</span>
                </li>
-               <li class="suggestion">
-                    <h4 class="text">can you help me find the latest news on web development?</h4>
+               <li class="suggestions-item">
+                    <p class="text">suggest some useful tools for debugging javascript code.</p>
                     <span class="icon material-symbols-rounded">explore</span>
                </li>
-               <li class="suggestion">
-                    <h4 class="text">write javascript code to sum all elements in an array.</h4>
-                    <span class="icon material-symbols-rounded">code</span>
+               <li class="suggestions-item">
+                    <p class="text">create a react js component for the simple todo list app.</p>
+                    <span class="icon material-symbols-rounded">code_blocks</span>
                </li>
           </ul>
-     </header>
-     <div class="chat-list"></div>
-     <div class="typing-area">
-          <form action="#" class="typing-form">
-               <div class="input-wrapper">
-                    <input type="text" class="typing-input" placeholder="enter a prompt here" required>
-                    <button class="icon material-symbols-rounded" id="send-message-button">send</button>
+          <div class="chats-container"></div>
+          <div class="prompt-container">
+               <div class="prompt-wrapper">
+                    <form action="#" class="prompt-form">
+                         <input type="text" placeholder="Ask Gemini" class="prompt-input" required/>
+                         <div class="prompt-actions">
+                              <div class="file-upload-wrapper">
+                                   <img src="#" class="file-preview"/>
+                                   <input id="file-input" type="file" accept="image/*,.pdf,.txt,.csv" hidden/>
+                                   <button type="button" class="file-icon material-symbols-rounded">description</button>
+                                   <button id="cancel-file-button" type="button" class="material-symbols-rounded">close</button>
+                                   <button id="add-file-button" type="button" class="material-symbols-rounded">attach_file</button>
+                              </div>
+                              <button id="stop-response-button" type="button" class="material-symbols-rounded">stop_circle</button>
+                              <button id="send-prompt-button" class="material-symbols-rounded">arrow_upward</button>
+                         </div>
+                    </form>
+                    <button id="theme-toggle-button" class="material-symbols-rounded">light_mode</button>
+                    <button id="delete-chats-button" class="material-symbols-rounded">delete</button>
                </div>
-               <div class="action-buttons">
-                    <span class="icon material-symbols-rounded" id="theme-toggle-button">light_mode</span>
-                    <span class="icon material-symbols-rounded" id="delete-chat-button">delete</span>
-               </div>
-          </form>
-          <p class="disclaimer-text">gemini may display inaccurate info, including about people, so double-check its responses.</p>
+               <p class="disclaimer-text">gemini can make mistakes, so double-check it.</p>
+          </div>
      </div>
 </body>
 </html>

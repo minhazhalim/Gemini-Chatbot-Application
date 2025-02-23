@@ -1,128 +1,139 @@
-const typingForm = document.querySelector('.typing-form');
-const chatContainer = document.querySelector('.chat-list');
-const toggleThemeButton = document.querySelector('#theme-toggle-button');
-const deleteChatButton = document.querySelector('#delete-chat-button');
-const suggestions = document.querySelectorAll('.suggestion');
-const API_KEY = 'AIzaSyDqSJl6F8O0RnTEvstWPYAUccQ993MPzc0';
-const API_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
-let userMessage = null;
-let isResponseGenerating = false;
-const loadDataFromLocalStorage = () => {
-     const savedChats = localStorage.getItem('saved-chats');
-     const isLightMode = (localStorage.getItem('themeColor') === 'light_mode');
-     document.body.classList.toggle('light_mode',isLightMode);
-     toggleThemeButton.innerText = isLightMode ? 'dark_mode' : 'light_mode';
-     chatContainer.innerHTML = savedChats || "";
-     document.body.classList.toggle('hide-header',savedChats);
-     chatContainer.scrollTo(0,chatContainer.scrollHeight);
-};
-loadDataFromLocalStorage();
+const container = document.querySelector('.container');
+const chatsContainer = document.querySelector('.chats-container');
+const promptForm = document.querySelector('.prompt-form');
+const promptInput = promptForm.querySelector('.prompt-input');
+const fileInput = promptForm.querySelector('#file-input');
+const fileUploadWrapper = promptForm.querySelector('.file-upload-wrapper');
+const themeToggleButton = document.querySelector('#theme-toggle-button');
+const API_KEY = 'AIzaSyDwENyzAw96HJJd5lrEilyYv7wPQYVNz68';
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+const chatHistory = [];
+const userData = {message: "",file: {}};
+const isLightTheme = localStorage.getItem('themeColor') === 'light_mode';
+let typingInterval;
+let controller;
+document.body.classList.toggle("light-theme",isLightTheme);
+themeToggleButton.textContent = isLightTheme ? 'dark_mode' : 'light_mode';
 const createMessageElement = (content,...classes) => {
      const div = document.createElement('div');
      div.classList.add('message',...classes);
      div.innerHTML = content;
      return div;
 };
-const showTypingEffect = (text,textElement,incomingMessageDiv) => {
+const scrollToBottom = () => container.scrollTo({top: container.scrollHeight,behavior: 'smooth'});
+const typingEffect = (text,textElement,botMessageDiv) => {
+     textElement.textContent = "";
      const words = text.split(" ");
-     let currentWordIndex = 0;
-     const typingInterval = setInterval(() => {
-          textElement.innerText += (currentWordIndex === 0 ? "" : " ") + words[currentWordIndex++];
-          incomingMessageDiv.querySelector('.icon').classList.add('hide');
-          if(currentWordIndex === words.length){
+     let wordIndex = 0;
+     typingInterval = setInterval(() => {
+          if(wordIndex < words.length){
+               textElement.textContent += (wordIndex === 0 ? "" : " ") + words[wordIndex++];
+               scrollToBottom();
+          }else {
                clearInterval(typingInterval);
-               isResponseGenerating = false;
-               incomingMessageDiv.querySelector('.icon').classList.remove('hide');
-               localStorage.setItem('saved-chats',chatContainer.innerHTML);
+               botMessageDiv.classList.remove('loading');
+               document.body.classList.remove('bot-responding');
           }
-          chatContainer.scrollTo(0,chatContainer.scrollHeight);
-     },75);
+     },40);
 };
-const generateAPIResponse = async (incomingMessageDiv) => {
-     const textElement = incomingMessageDiv.querySelector('.text');
+const generateResponse = async (botMessageDiv) => {
+     const textElement = botMessageDiv.querySelector('.message-text');
+     controller = new AbortController();
+     chatHistory.push({
+          role: 'user',
+          parts: [{text: userData.message},...(userData.file.data ? [{ inline_data: (({fileName,isImage,...rest}) => rest)(userData.file)}] : [])],
+     });
      try {
           const response = await fetch(API_URL,{
                method: 'POST',
                headers: {'Content-Type': 'application/json'},
-               body: JSON.stringify({
-                    contents: [{
-                         role: 'user',
-                         parts: [{text: userMessage}],
-                    }],
-               }),
+               body: JSON.stringify({contents: chatHistory}),
+               signal: controller.signal,
           });
           const data = await response.json();
           if(!response.ok) throw new Error(data.error.message);
-          const apiResponse = data?.candidates[0].content.parts[0].text.replace(/\*\*(.*?)\*\*/g,'$1');
-          showTypingEffect(apiResponse,textElement,incomingMessageDiv);
-     }catch(error){
-          isResponseGenerating = false;
-          textElement.innerText = error.message;
-          textElement.parentElement.closest('.message').classList.add('error');
-     }finally {
-          incomingMessageDiv.classList.remove('loading');
+          const responseText = data.candidates[0].content.parts[0].text.replace(/\*\*([^*]+)\*\*/g,'$1').trim();
+          typingEffect(responseText, textElement, botMessageDiv);
+          chatHistory.push({ role: 'model', parts: [{ text: responseText }] });
+     } catch (error) {
+          textElement.textContent = error.name === 'AbortError' ? 'Response generation stopped.' : error.message;
+          textElement.style.color = '#d62939';
+          botMessageDiv.classList.remove('loading');
+          document.body.classList.remove('bot-responding');
+          scrollToBottom();
+     } finally {
+          userData.file = {};
      }
 };
-const copyMessage = (copyButton) => {
-     const messageText = copyButton.parentElement.querySelector('.text').innerText;
-     navigator.clipboard.writeText(messageText);
-     copyButton.innerText = 'done';
-     setTimeout(() => copyButton.innerText = 'content_copy',1000);
-};
-const showLoadingAnimation = () => {
-     const html = `
-          <div class="message-content">
-               <img class="avatar" src="gemini.svg" alt="Gemini avatar">
-               <p class="text"></p>
-               <div class="loading-indicator">
-                    <div class="loading-bar"></div>
-                    <div class="loading-bar"></div>
-                    <div class="loading-bar"></div>
-               </div>
-          </div>
-          <span onClick="copyMessage(this)" class="icon material-symbols-rounded">content_copy</span>
+const handleFormSubmit = (event) => {
+     event.preventDefault();
+     const userMessage = promptInput.value.trim();
+     if(!userMessage || document.body.classList.contains('bot-responding')) return;
+     userData.message = userMessage;
+     promptInput.value = "";
+     document.body.classList.add('chats-active', 'bot-responding');
+     fileUploadWrapper.classList.remove('file-attached', 'img-attached', 'active');
+     const userMsgHTML = `
+          <p class="message-text"></p>
+          ${userData.file.data ? (userData.file.isImage ? `<img src="data:${userData.file.mime_type};base64,${userData.file.data}" class="image-attachment" />` : `<p class="file-attachment"><span class="material-symbols-rounded">description</span>${userData.file.fileName}</p>`) : ""}
      `;
-     const incomingMessageDiv = createMessageElement(html,'incoming','loading');
-     chatContainer.appendChild(incomingMessageDiv);
-     chatContainer.scrollTo(0,chatContainer.scrollHeight);
-     generateAPIResponse(incomingMessageDiv);
+     const userMsgDiv = createMessageElement(userMsgHTML, 'user-message');
+     userMsgDiv.querySelector('.message-text').textContent = userData.message;
+     chatsContainer.appendChild(userMsgDiv);
+     scrollToBottom();
+     setTimeout(() => {
+          const botMessageHTML = `<img class='avatar' src='gemini.svg'/><p class='message-text'>Just a sec...</p>`;
+          const botMessageDiv = createMessageElement(botMessageHTML,'bot-message','loading');
+          chatsContainer.appendChild(botMessageDiv);
+          scrollToBottom();
+          generateResponse(botMessageDiv);
+     }, 600);
 };
-const handleOutgoingChat = () => {
-     userMessage = typingForm.querySelector('.typing-input').value.trim() || userMessage;
-     if(!userMessage || isResponseGenerating) return;
-     isResponseGenerating = true;
-     const html = `
-          <div class="message-content">
-               <img class="avatar" src="user.jpg" alt="User avatar">
-               <p class="text"></p>
-          </div>
-     `;
-     const outgoingMessageDiv = createMessageElement(html,'outgoing');
-     outgoingMessageDiv.querySelector('.text').innerText = userMessage;
-     chatContainer.appendChild(outgoingMessageDiv);
-     typingForm.reset();
-     document.body.classList.add('hide-header');
-     chatContainer.scrollTo(0,chatContainer.scrollHeight);
-     setTimeout(showLoadingAnimation,500);
-};
-toggleThemeButton.addEventListener('click',() => {
-     const isLightMode = document.body.classList.toggle('light_mode');
-     localStorage.setItem('themeColor',isLightMode ? 'light_mode' : 'dark_mode');
-     toggleThemeButton.innerText = isLightMode ? 'dark_mode' : 'light_mode';
+promptForm.addEventListener('submit',handleFormSubmit);
+fileInput.addEventListener('change',() => {
+     const file = fileInput.files[0];
+     if(!file) return;
+     const isImage = file.type.startsWith('image/');
+     const reader = new FileReader();
+     reader.readAsDataURL(file);
+     reader.onload = (event) => {
+          fileInput.value = "";
+          const base64String = event.target.result.split(',')[1];
+          fileUploadWrapper.querySelector('.file-preview').src = event.target.result;
+          fileUploadWrapper.classList.add('active', isImage ? 'image-attached' : 'file-attached');
+          userData.file = {fileName: file.name,data: base64String,mime_type: file.type,isImage};
+     };
 });
-deleteChatButton.addEventListener('click',() => {
-     if(confirm('Are You Sure You Want to Delete All the Chats?')){
-          localStorage.removeItem('saved-chats');
-          loadDataFromLocalStorage();
-     }
+document.querySelector('#cancel-file-button').addEventListener('click',() => {
+     userData.file = {};
+     fileUploadWrapper.classList.remove('file-attached','image-attached','active');
 });
-suggestions.forEach(suggestion => {
+document.querySelector('#stop-response-button').addEventListener('click',() => {
+     controller?.abort();
+     userData.file = {};
+     clearInterval(typingInterval);
+     chatsContainer.querySelector('.bot-message.loading').classList.remove('loading');
+     document.body.classList.remove("bot-responding");
+});
+themeToggleButton.addEventListener('click',() => {
+     const isLightTheme = document.body.classList.toggle('light-theme');
+     localStorage.setItem('themeColor', isLightTheme ? 'light_mode' : 'dark_mode');
+     themeToggleButton.textContent = isLightTheme ? 'dark_mode' : 'light_mode';
+});
+document.querySelector('#delete-chats-button').addEventListener('click',() => {
+     chatHistory.length = 0;
+     chatsContainer.innerHTML = "";
+     document.body.classList.remove('chats-active','bot-responding');
+});
+document.querySelectorAll('.suggestions-item').forEach((suggestion) => {
      suggestion.addEventListener('click',() => {
-          userMessage = suggestion.querySelector('.text').innerText;
-          handleOutgoingChat();
+          promptInput.value = suggestion.querySelector('.text').textContent;
+          promptForm.dispatchEvent(new Event('submit'));
      });
 });
-typingForm.addEventListener('submit',(event) => {
-     event.preventDefault();
-     handleOutgoingChat();
+document.addEventListener('click',({target}) => {
+     const wrapper = document.querySelector('.prompt-wrapper');
+     const shouldHide = target.classList.contains('prompt-input') || (wrapper.classList.contains('hide-controls') && (target.id === 'add-file-button' || target.id === 'stop-response-button'));
+     wrapper.classList.toggle("hide-controls",shouldHide);
 });
+promptForm.querySelector('#add-file-button').addEventListener('click',() => fileInput.click());
